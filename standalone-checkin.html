@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>สแกนเช็คอินหน้างาน</title>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, "Sarabun", sans-serif;
+    text-align: center;
+    padding: 20px;
+    margin: 0;
+    background: #f7f7f8;
+  }
+  h2 { margin-top: 0; }
+  #reader {
+    width: 100%;
+    max-width: 400px;
+    margin: 0 auto;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+  #result {
+    font-size: 20px;
+    margin-top: 20px;
+    font-weight: bold;
+    min-height: 40px;
+  }
+  .manual-box {
+    margin-top: 30px;
+    border-top: 1px solid #ccc;
+    padding-top: 20px;
+    max-width: 400px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  .manual-box input {
+    padding: 10px;
+    font-size: 18px;
+    width: 200px;
+    text-transform: uppercase;
+    border: 1px solid #ccc;
+    border-radius: 8px;
+  }
+  .manual-box button {
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #1a73e8;
+    color: white;
+    margin-left: 8px;
+    cursor: pointer;
+  }
+  .manual-box button:active { background: #1558b3; }
+  #configWarning {
+    background: #fff3cd;
+    color: #856404;
+    padding: 12px;
+    border-radius: 8px;
+    max-width: 400px;
+    margin: 0 auto 20px auto;
+    font-size: 14px;
+    display: none;
+  }
+</style>
+</head>
+<body>
+
+  <h2>สแกน QR Code เช็คอิน</h2>
+
+  <!-- ==================================================== -->
+  <!-- แก้บรรทัดนี้: วาง URL /exec ของ Apps Script Web App    -->
+  <!-- ==================================================== -->
+  <script>
+    const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbymJGtY5kmnhVEEzbIWsTl0Ib5SdYhOpBGWTxdYaTYaprlOaTYtZ1ZgJmyojgsxlS0r/exec';
+  </script>
+
+  <div id="configWarning">
+    ⚠️ ยังไม่ได้ตั้งค่า WEBAPP_URL ในไฟล์นี้ กรุณาแก้ตัวแปร WEBAPP_URL ในโค้ด
+    ให้เป็นลิงก์ /exec ของ Apps Script ก่อนใช้งานจริง
+  </div>
+
+  <div id="reader"></div>
+  <div id="result"></div>
+
+  <div class="manual-box">
+    <p>หรือกรอกรหัสลงทะเบียนด้วยตนเอง (ใช้กรณีกล้องใช้ไม่ได้)</p>
+    <input type="text" id="manualInput" placeholder="เช่น REG-A1B2C3D4">
+    <button onclick="manualCheckIn()">เช็คอิน</button>
+  </div>
+
+  <script>
+    // เตือนถ้ายังไม่ได้ตั้งค่า URL
+    if (!WEBAPP_URL || WEBAPP_URL.indexOf('script.google.com') === -1) {
+      document.getElementById('configWarning').style.display = 'block';
+    }
+
+    const scanner = new Html5QrcodeScanner("reader", { fps: 10, qrbox: 250 });
+
+    function onScanSuccess(decodedText) {
+      scanner.pause();
+      doCheckIn(decodedText, () => scanner.resume());
+    }
+
+    function manualCheckIn() {
+      const val = document.getElementById('manualInput').value.trim().toUpperCase();
+      if (!val) return;
+      doCheckIn(val, () => {});
+      document.getElementById('manualInput').value = '';
+    }
+
+    function doCheckIn(regId, onDone) {
+      const el = document.getElementById('result');
+      el.innerHTML = 'กำลังตรวจสอบ...';
+      el.style.color = '#333';
+
+      const url = WEBAPP_URL + '?action=checkin&regId=' + encodeURIComponent(regId);
+
+      fetch(url)
+        .then(res => res.json())
+        .then(showResult)
+        .catch(err => {
+          el.innerHTML = '❌ เชื่อมต่อไม่สำเร็จ ลองใหม่อีกครั้ง';
+          el.style.color = 'red';
+          console.error(err);
+        })
+        .finally(() => {
+          setTimeout(() => {
+            document.getElementById('result').innerHTML = '';
+            onDone();
+          }, 2500);
+        });
+    }
+
+    function showResult(res) {
+      const el = document.getElementById('result');
+      if (res.status === 'success') {
+        el.innerHTML = '✅ เช็คอินสำเร็จ: ' + res.name;
+        el.style.color = 'green';
+      } else if (res.status === 'duplicate') {
+        el.innerHTML = '⚠️ เช็คอินซ้ำแล้ว: ' + res.name;
+        el.style.color = 'orange';
+      } else {
+        el.innerHTML = '❌ ไม่พบรหัสลงทะเบียนนี้';
+        el.style.color = 'red';
+      }
+    }
+
+    scanner.render(onScanSuccess);
+  </script>
+
+</body>
+</html>
